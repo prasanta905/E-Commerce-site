@@ -1,0 +1,25 @@
+# ShopSphere root .gitignore — managed centrally, nodes excluded
+# Build outputs
+backend/target/
+backend/build/
+frontend/dist/
+frontend/node_modules/
+frontend/coverage/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Local secrets (never commit credentials)
+backend/src/main/resources/application-local.properties
+backend/src/test/resources/application-test.properties
+.env
+*.local
+
+# OS noise
+Thumbs.db
+.DS_Store
+
+# Maven wrapper cache / logs
+*.log

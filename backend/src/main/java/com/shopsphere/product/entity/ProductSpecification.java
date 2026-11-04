@@ -1,0 +1,45 @@
+package com.shopsphere.product.entity;
+
+import com.shopsphere.common.entity.TimestampedEntity;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Entity
+@Table(name = "product_specifications",
+       uniqueConstraints = @UniqueConstraint(name = "ux_spec_prod_key", columnNames = { "product_id", "spec_key" }),
+       indexes = @Index(name = "ix_spec_prod", columnList = "product_id"))
+@Getter @Setter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+@Builder
+public class ProductSpecification extends TimestampedEntity {
+
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "product_id", nullable = false)
+    private Product product;
+
+    @Column(name = "spec_key", nullable = false, length = 80)
+    private String specKey;
+
+    @Column(name = "spec_value", nullable = false)
+    private String specValue;
+}

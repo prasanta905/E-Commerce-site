@@ -1,0 +1,94 @@
+server:
+  port: 8080
+  error:
+    include-stacktrace: never
+    include-message: never
+
+spring:
+  application:
+    name: shopsphere
+
+  profiles:
+    # `local` profile is loaded by default for dev. Production overrides via real env vars.
+    active: ${SPRING_PROFILES_ACTIVE:local}
+
+  datasource:
+    # Credentials come from the active profile file / environment variables only.
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      leak-detection-threshold: 60000
+
+  jpa:
+    hibernate:
+      # NEVER generate schema from entities in production. Flyway is the source of truth.
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: false
+        jdbc:
+          batch_size: 30
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 25MB
+
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  health:
+    defaults:
+      enabled: true
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  level:
+    com.shopsphere: INFO
+    org.springframework.security: WARN
+    org.hibernate: WARN
+
+shopsphere:
+  app:
+    security:
+      jwt:
+        secret-key: ${JWT_SECRET_KEY}
+        issuer: shopsphere
+        access-token-ttl-ms: 900000          # 15 min
+        refresh-token-ttl-ms: 604800000      # 7 days
+      cookie:
+        secure: ${JWT_COOKIE_SECURE:false}   # true behind HTTPS in production
+        same-site: Lax
+    cors:
+      allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
+
+    file-upload:
+      upload-dir: ${UPLOAD_DIR:uploads}
+      allowed-image-extensions: jpg,jpeg,png,webp
+
+    razorpay:
+      key-id: ${RAZORPAY_KEY_ID:}
+      key-secret: ${RAZORPAY_KEY_SECRET:}
+      webhook-secret: ${RAZORPAY_WEBHOOK_SECRET:}
+      enabled: ${RAZORPAY_ENABLED:false}
+
+    mail:
+      console-fallback: ${MAIL_CONSOLE_FALLBACK:true}
+      from: ${MAIL_FROM:noreply@shopsphere.local}

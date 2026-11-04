@@ -1,0 +1,17 @@
+@import "tailwindcss";
+
+/* ShopSphere design-system tokens (expanded in Phase 5 with full theme) */
+:root {
+  --brand: #4f46e5;
+  --brand-dark: #4338ca;
+  --surface: #0f172a;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
