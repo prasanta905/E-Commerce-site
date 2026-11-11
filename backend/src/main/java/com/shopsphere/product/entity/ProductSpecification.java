@@ -1,7 +1,5 @@
 package com.shopsphere.product.entity;
 
-import com.shopsphere.common.entity.TimestampedEntity;
-
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -28,7 +26,7 @@ import lombok.Setter;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 @Builder
-public class ProductSpecification extends TimestampedEntity {
+public class ProductSpecification {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

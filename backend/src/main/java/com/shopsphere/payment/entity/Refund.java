@@ -7,6 +7,8 @@ import com.shopsphere.order.entity.ReturnRequest;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -48,6 +50,7 @@ public class Refund extends TimestampedEntity {
     @Column(name = "gateway_refund_id", length = 64)
     private String gatewayRefundId;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 15)
     @Builder.Default
     private RefundStatus status = RefundStatus.REQUESTED;

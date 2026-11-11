@@ -2,7 +2,6 @@ package com.shopsphere.coupon.entity;
 
 import java.time.Instant;
 
-import com.shopsphere.common.entity.TimestampedEntity;
 import com.shopsphere.order.entity.Order;
 import com.shopsphere.user.entity.User;
 
@@ -15,6 +14,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
@@ -33,7 +33,7 @@ import lombok.Setter;
        indexes = { @Index(name = "ix_cr_user", columnList = "user_id, coupon_id") })
 @Getter @Setter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class CouponRedemption extends TimestampedEntity {
+public class CouponRedemption {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -50,6 +50,16 @@ public class CouponRedemption extends TimestampedEntity {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "order_id", nullable = false)
     private Order order;
+
+    @Column(name = "redeemed_at", nullable = false, updatable = false)
+    private Instant redeemedAt;
+
+    @PrePersist
+    void onCreate() {
+        if (redeemedAt == null) {
+            redeemedAt = Instant.now();
+        }
+    }
 
     void attach(Coupon c) { this.coupon = c; }
 

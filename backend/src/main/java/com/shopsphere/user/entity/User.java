@@ -73,6 +73,7 @@ public class User extends TimestampedEntity {
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     @Getter(AccessLevel.NONE) @Setter(AccessLevel.NONE)
+    @Builder.Default
     private List<Address> addresses = new ArrayList<>();
 
     // convenience accessors keep Lombok from leaking mutable collections

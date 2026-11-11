@@ -53,16 +53,17 @@ GET/PUT /users/me — view/update profile
 GET/POST/PUT/DELETE /users/me/addresses[/id]
 
 ## Checkout 🔒
-| POST | /checkout/preview | {addressId, shippingMethodId, couponCode?, paymentMethod} | CheckoutPreviewDto {subtotal, shipping, discount, total, stockIssues[]} |
-| POST | /checkout | same + optional idempotencyKey | creates order (PENDING if prepaid, CONFIRMED if COD) — body {addressId, shippingMethodId, couponCode, paymentMethod, idempotencyKey} → {orderId, razorpayOrderId?} |
+| GET | /checkout/shipping-methods | - | [{id, code, name, baseFee, freeAbove}] — code-defined catalogue |
+| POST | /checkout/preview | {addressId, shippingMethodId, couponCode?} | CheckoutPreviewDto {subtotal, discount, shippingFee, total, shippingMethodName, stockIssues[]} |
+| POST | /checkout | {addressId, shippingMethodId, couponCode?, paymentMethod (COD\|RAZORPAY), idempotencyKey, termsAccepted: "true"} | creates order (PENDING if prepaid, CONFIRMED if COD) → {orderId} — repeated idempotencyKey returns the same order |
 
 ## Orders 🔒
-GET /orders?page (own only) · GET /orders/{id} · POST /orders/{id}/cancel · POST /orders/{id}/return-request {reason} · GET /orders/{id}/invoice (PDF)
+GET /orders?page (own only) · GET /orders/{id} · POST /orders/{id}/cancel · POST /orders/{id}/return-request {reason} · GET /orders/{id}/invoice (PDF, owner-only, unavailable while PENDING/CANCELLED)
 
 ## Payments 🔒
-POST /payments/create-order {orderId} → {razorpayOrderId, amount} idempotent
-POST /payments/verify {orderId, razorpay_order_id, razorpay_payment_id, razorpay_signature} → HMAC verify → update order → 200/400
-POST /payments/webhook — raw Razorpay payload signature verified (x-razorpay-signature)
+POST /payments/orders/{orderId}/create → PaymentSetupDto {gatewayOrderId, keyId, amount, currency, orderNumber, paymentStatus} — owner-scoped, idempotent, 503 RAZORPAY_NOT_CONFIGURED when disabled
+POST /payments/verify {razorpayOrderId, razorpayPaymentId, razorpaySignature} → HMAC(gatewayOrderId|paymentId) verify → order CONFIRMED → {orderStatus, paymentStatus} (idempotent for already-paid)
+POST /payments/webhook — raw Razorpay payload HMAC-verified via X-Razorpay-Signature (idempotent settlement)
 
 ## Admin 🔒 ROLE_ADMIN
 GET /admin/dashboard · GET /admin/analytics?period=daily|weekly|monthly|yearly&from&to

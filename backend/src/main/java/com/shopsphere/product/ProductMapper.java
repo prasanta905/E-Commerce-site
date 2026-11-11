@@ -22,7 +22,8 @@ import com.shopsphere.product.entity.ProductSpecification;
 public class ProductMapper {
 
     public ProductCardDto toCard(Product p, Inventory inventory) {
-        int available = inventory == null ? 0 : inventory.availableQuantity();
+        Inventory inv = inventory != null ? inventory : p.getInventory();
+        int available = inv == null ? 0 : inv.availableQuantity();
         return new ProductCardDto(
             p.getId(), p.getName(), p.getSlug(), p.getSellingPrice(), p.getMrp(),
             ProductCardDto.discountPercent(p.getMrp(), p.getSellingPrice()),
@@ -57,7 +58,7 @@ public class ProductMapper {
     }
 
     public ProductListResponse toListResponse(Page<Product> page) {
-        List<ProductCardDto> items = page.getContent().stream().map(p -> toCard(p, null)).toList();
+        List<ProductCardDto> items = page.getContent().stream().map(p -> toCard(p, p.getInventory())).toList();
         return new ProductListResponse(items, PageResponse.from(page));
     }
 

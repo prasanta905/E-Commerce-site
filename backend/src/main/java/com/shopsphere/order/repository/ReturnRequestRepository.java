@@ -10,11 +10,12 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.shopsphere.order.entity.ReturnRequest;
+import com.shopsphere.order.entity.ReturnStatus;
 
 public interface ReturnRequestRepository extends JpaRepository<ReturnRequest, Long> {
     Optional<ReturnRequest> findByOrderId(Long orderId);
 
-    Page<ReturnRequest> findByStatusOrderByCreatedAtDesc(ReturnStatus status);
+    List<ReturnRequest> findByStatusOrderByCreatedAtDesc(ReturnStatus status);
 
     Page<ReturnRequest> findAllByOrderByCreatedAtDesc(Pageable pageable);
 

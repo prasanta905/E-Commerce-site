@@ -2,7 +2,6 @@ package com.shopsphere.order.entity;
 
 import java.math.BigDecimal;
 
-import com.shopsphere.common.entity.TimestampedEntity;
 import com.shopsphere.product.entity.Product;
 
 import jakarta.persistence.Column;
@@ -31,7 +30,7 @@ import lombok.Setter;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 @Builder
-public class OrderItem extends TimestampedEntity {
+public class OrderItem {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

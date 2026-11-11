@@ -60,8 +60,7 @@ public class Review extends TimestampedEntity {
     @Column(name = "title", length = 120)
     private String title;
 
-    @Lob
-    @Column(name = "body")
+    @Column(name = "body", columnDefinition = "TEXT")
     private String body;
 
     @Column(name = "is_verified", nullable = false)

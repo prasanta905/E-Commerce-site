@@ -12,6 +12,8 @@ import com.shopsphere.user.entity.User;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -67,10 +69,12 @@ public class Order extends TimestampedEntity {
     @Column(name = "total_amount", nullable = false, precision = 10, scale = 2)
     private BigDecimal totalAmount;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 30)
     @Builder.Default
     private OrderStatus status = OrderStatus.PENDING;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "payment_method", nullable = false, length = 15)
     private PaymentMethod paymentMethod;
 
@@ -90,9 +94,6 @@ public class Order extends TimestampedEntity {
 
     @OneToOne(mappedBy = "order")
     private Shipment shipment;
-
-    @Column(name = "paid_at", updatable = true)
-    private Instant paidAt;
 
     public void addItem(OrderItem item) {
         items.add(item);

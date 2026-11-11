@@ -47,8 +47,7 @@ public class Notification {
     @Column(name = "title", nullable = false, length = 120)
     private String title;
 
-    @Lob
-    @Column(name = "body")
+    @Column(name = "body", columnDefinition = "TEXT")
     private String body;
 
     @Column(name = "read_at")

@@ -33,6 +33,27 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(body);
     }
 
+    /** RBAC denial — @PreAuthorize rethrows AccessDeniedException which the
+     * generic handler would otherwise turn into a misleading 500. */
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ResponseEntity<ApiError> accessDenied(
+            org.springframework.security.access.AccessDeniedException ex,
+            org.springframework.web.context.request.WebRequest request) {
+        ApiError body = ApiError.of(403, "FORBIDDEN",
+                "You do not have permission to perform this action", currentPath(request));
+        return ResponseEntity.status(403).body(body);
+    }
+
+    /** Authentication failures surfaced by the method-security layer. */
+    @ExceptionHandler(org.springframework.security.core.AuthenticationException.class)
+    public ResponseEntity<ApiError> unauthenticated(
+            org.springframework.security.core.AuthenticationException ex,
+            org.springframework.web.context.request.WebRequest request) {
+        ApiError body = ApiError.of(401, "AUTH_REQUIRED", "Authentication required",
+                currentPath(request));
+        return ResponseEntity.status(401).body(body);
+    }
+
     /** Generic catch-all — never leaks internals to the customer. */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> unhandled(Exception ex,

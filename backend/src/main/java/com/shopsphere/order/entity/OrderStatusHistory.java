@@ -4,6 +4,8 @@ import java.time.Instant;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -39,9 +41,11 @@ public class OrderStatusHistory {
     private Order order;
 
     /** null for the first entry (creation). */
+    @Enumerated(EnumType.STRING)
     @Column(name = "previous_status", length = 30)
     private OrderStatus previousStatus;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "new_status", nullable = false, length = 30)
     private OrderStatus newStatus;
 

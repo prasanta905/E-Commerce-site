@@ -27,10 +27,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class OrderController {
 
     private final OrderService orderService;
+    private final com.shopsphere.invoice.InvoiceService invoiceService;
     private final CurrentUser currentUser;
 
-    public OrderController(OrderService orderService, CurrentUser currentUser) {
+    public OrderController(OrderService orderService,
+                           com.shopsphere.invoice.InvoiceService invoiceService,
+                           CurrentUser currentUser) {
         this.orderService = orderService;
+        this.invoiceService = invoiceService;
         this.currentUser = currentUser;
     }
 
@@ -62,6 +66,17 @@ public class OrderController {
     public ResponseEntity<ApiResponse<OrderDetailDto>> detail(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(
                 orderService.detailForUser(id, currentUser.requireUserId())));
+    }
+
+    @Operation(summary = "Download the order invoice as PDF (owner only; confirmed orders onwards)")
+    @GetMapping("/{id}/invoice")
+    public ResponseEntity<byte[]> invoice(@PathVariable Long id) {
+        byte[] pdf = invoiceService.renderForUser(id, currentUser.requireUserId());
+        return ResponseEntity.ok()
+                .header("Content-Disposition", "attachment; filename=invoice-" + id + ".pdf")
+                .header("Cache-Control", "no-store")
+                .contentType(org.springframework.http.MediaType.APPLICATION_PDF)
+                .body(pdf);
     }
 
     @Operation(summary = "Cancel an order (allowed while PENDING/CONFIRMED; stock released/restored)")

@@ -7,6 +7,8 @@ import com.shopsphere.common.entity.TimestampedEntity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -35,6 +37,7 @@ public class Coupon extends TimestampedEntity {
     @Column(name = "code", nullable = false, unique = true, length = 30)
     private String code;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "discount_type", nullable = false, length = 10)
     private DiscountType discountType;
 

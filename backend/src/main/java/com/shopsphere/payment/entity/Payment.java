@@ -9,6 +9,8 @@ import com.shopsphere.order.entity.PaymentMethod;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -46,6 +48,7 @@ public class Payment extends TimestampedEntity {
     @JoinColumn(name = "order_id", nullable = false, unique = true)
     private Order order;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "method", nullable = false, length = 15)
     private PaymentMethod method;
 
@@ -56,6 +59,7 @@ public class Payment extends TimestampedEntity {
     @Column(name = "razorpay_payment_id", length = 64)
     private String razorpayPaymentId;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 15)
     @Builder.Default
     private PaymentStatus status = PaymentStatus.PENDING;

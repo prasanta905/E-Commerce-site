@@ -1,7 +1,5 @@
 package com.shopsphere.product.entity;
 
-import com.shopsphere.common.entity.TimestampedEntity;
-
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -25,7 +23,7 @@ import lombok.Setter;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 @Builder
-public class ProductImage extends TimestampedEntity {
+public class ProductImage {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -47,5 +45,6 @@ public class ProductImage extends TimestampedEntity {
     @Builder.Default
     private Integer sortOrder = 0;
 
-    void assignProduct(Product p) { this.product = p; }
+    public void attachTo(Product p) { this.product = p; }
+    public void assignProduct(Product p) { this.product = p; }
 }

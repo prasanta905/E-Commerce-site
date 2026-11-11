@@ -135,6 +135,54 @@ public class OrderService {
                 (reason == null || reason.isBlank() ? "" : (": " + reason)));
     }
 
+    @Transactional(readOnly = true)
+    public Page<OrderSummaryDto> listAllForAdmin(String statusStr, String search, int page, int size) {
+        OrderStatus status = null;
+        if (statusStr != null && !statusStr.isBlank() && !statusStr.equalsIgnoreCase("ALL")) {
+            try {
+                status = OrderStatus.valueOf(statusStr.toUpperCase());
+            } catch (Exception ignored) {}
+        }
+        String q = (search != null && !search.isBlank()) ? search.trim() : null;
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(Math.max(0, page), Math.max(1, size));
+        return orderRepository.searchAdmin(status, q, pageable).map(this::toSummary);
+    }
+
+    @Transactional(readOnly = true)
+    public OrderDetailDto detailForAdmin(Long orderId) {
+        Order order = orderRepository.findById(orderId).orElseThrow(() -> ResourceNotFound.of("Order"));
+        return toDetail(order);
+    }
+
+    @Transactional
+    public void transitionStatusByAdmin(Long orderId, OrderStatus target, String adminEmail, String note) {
+        Order order = orderRepository.findById(orderId).orElseThrow(() -> ResourceNotFound.of("Order"));
+        OrderStatus from = order.getStatus();
+        if (from == target) {
+            return;
+        }
+        if (!from.canTransitionTo(target)) {
+            throw BusinessException.conflict("INVALID_STATE_TRANSITION",
+                    "Cannot transition order from " + from + " to " + target);
+        }
+        if (target == OrderStatus.CANCELLED) {
+            for (OrderItem item : order.getItems()) {
+                if (from == OrderStatus.PENDING) {
+                    inventoryRepository.release(item.getProduct().getId(), item.getQuantity());
+                } else {
+                    inventoryRepository.restock(item.getProduct().getId(), item.getQuantity());
+                }
+            }
+        } else if (target == OrderStatus.RETURNED) {
+            for (OrderItem item : order.getItems()) {
+                inventoryRepository.restock(item.getProduct().getId(), item.getQuantity());
+            }
+        }
+        order.setStatus(target);
+        orderRepository.save(order);
+        appendHistory(order, from, "admin:" + adminEmail, note == null || note.isBlank() ? "Status changed by admin" : note);
+    }
+
     // --------------------------------------------------------- mapping
     OrderSummaryDto toSummary(Order order) {
         List<OrderSummaryDto.ItemLine> items = order.getItems().stream()

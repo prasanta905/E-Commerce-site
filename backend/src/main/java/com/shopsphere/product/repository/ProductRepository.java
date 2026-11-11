@@ -74,4 +74,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     long countByIsDeletedFalse();
     long countByIsActiveTrueAndIsDeletedFalse();
     long countByRatingAvgGreaterThanEqualAndIsDeletedFalse(BigDecimal minRating);
+
+    boolean existsByCategoryIdAndIsDeletedFalse(Long categoryId);
+    boolean existsByBrandIdAndIsDeletedFalse(Long brandId);
 }

@@ -51,7 +51,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
                    OR LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%')))
             ORDER BY o.createdAt DESC
             """)
-    Page<Order> searchAdmin(@Param("status") String status,
+    Page<Order> searchAdmin(@Param("status") OrderStatus status,
                             @Param("search") String search,
                             Pageable pageable);
 

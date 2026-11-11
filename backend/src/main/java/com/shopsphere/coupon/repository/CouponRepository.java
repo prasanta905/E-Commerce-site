@@ -12,6 +12,7 @@ public interface CouponRepository extends JpaRepository<Coupon, Long> {
     Optional<Coupon> findByCodeIgnoreCaseAndIsActiveTrue(String code);
     boolean existsByCodeIgnoreCase(String code);
     Optional<Coupon> findById(Long id);
+    java.util.List<Coupon> findAllByDeletedAtIsNullOrderByCreatedAtDesc();
 
     /** Count of distinct successful redemptions by one user for one code (within checkout tx). */
     @Query("""
