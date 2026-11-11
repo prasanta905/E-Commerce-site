@@ -96,14 +96,6 @@ npm install
 npm run dev          # http://localhost:5173  (proxies /api and /uploads to :8080)
 ```
 
-### 4.5 Demo accounts (seeded)
-
-| Role | Email | Password |
-|---|---|---|
-| Admin | `admin@shopsphere.local` | `Admin@123` |
-| Customer | `customer1@shopsphere.local` | `User@123` |
-| Customer | `customer2@shopsphere.local` | `User@123` |
-
 ## 5. Testing
 
 Backend (real HTTP against the local DB — creates `it-*` test users/orders, safe to re-run):
