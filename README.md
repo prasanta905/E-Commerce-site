@@ -134,6 +134,8 @@ docker compose --env-file .env up --build
 
 Files: `backend/Dockerfile` (multi-stage Maven → JRE 21 alpine, non-root, healthcheck), `frontend/Dockerfile` + `nginx.conf` (SPA fallback + reverse proxy), `backend/src/main/resources/application-docker.properties`, `docker-compose.yml`.
 
+**Production (free VM):** use `docker-compose.prod.yml` — only Caddy exposes ports 80/443, with automatic HTTPS. Full step-by-step: `DEPLOYMENT.md`.
+
 ## 7. Production notes
 
 - Set `JWT_COOKIE_SECURE=true` and real CORS origins behind HTTPS.
@@ -143,6 +145,7 @@ Files: `backend/Dockerfile` (multi-stage Maven → JRE 21 alpine, non-root, heal
 
 ## 8. Documentation index
 
+- `DEPLOYMENT.md` — free live deployment guide (Oracle Always Free recommended, Render alternative)
 - `DEVELOPMENT_STATUS.md` — delivery report, verification evidence, known limitations
 - `docs/API_ENDPOINTS.md` — full `/api/v1` contract
 - `docs/DATABASE_DESIGN.md` — ER design and table relationships

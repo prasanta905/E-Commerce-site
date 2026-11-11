@@ -1,0 +1,6 @@
+# Caddy obtains and renews free Let's Encrypt certificates automatically.
+# PUBLIC_DOMAIN is injected by docker-compose.prod.yml from .env.
+{$PUBLIC_DOMAIN} {
+	encode gzip
+	reverse_proxy frontend:80
+}

@@ -113,3 +113,23 @@ _Updated: End of Full Stack Integration & Verification Cycle_
 ### Verified this cycle
 - `mvn compile` → EXIT=0; `mvn test` → `BUILD SUCCESS` (all tests pass, 0 failures).
 - `npm run build` → 0 TypeScript errors (all chunks compiled).
+
+---
+
+## 7. Deployment Readiness + Password Fix (Nov 11, 2026)
+
+### Free deployment package
+- **`docker-compose.prod.yml`** — production stack for a single always-free VM: MySQL + backend + frontend stay on the private compose network (no published ports), Caddy is the only public entry point, all services `restart: unless-stopped`.
+- **`Caddyfile`** — automatic Let's Encrypt HTTPS for `PUBLIC_DOMAIN` (e.g. a free DuckDNS subdomain).
+- **`frontend/nginx.conf`** — now also proxies `/swagger-ui*`, `/v3/api-docs` and `/actuator/health` so API docs and health checks work behind the reverse proxy.
+- **`.env.example`** — extended with the production variables (`PUBLIC_DOMAIN`, `CORS_ALLOWED_ORIGINS`, `JWT_COOKIE_SECURE`).
+- **`DEPLOYMENT.md`** — full guide: Oracle Cloud Always Free (recommended, verified 2026 free-tier facts), Render + Vercel alternative, firewall/DNS/Docker/deploy-key steps, backups, troubleshooting, cost summary.
+
+### Bug fix: password change did not persist
+- `POST /api/v1/users/me/password` returned `204` but the new hash was never written: the controller mutated a detached entity with no `save()`, and `ProfileService.changePassword` was an empty stub.
+- Logic moved to a transactional `ProfileService.changePassword` (BCrypt verify → encode → dirty-check persist); controller now delegates.
+- Two new integration tests: new password works / old rejected, wrong current password → `400`.
+
+### Verified this cycle
+- `mvn test` → **11 tests, 0 failures** (AuthRbacIntegrationTest 7, CheckoutFlowIntegrationTest 3, context 1).
+- CI on GitHub Actions: backend suite against MySQL 8 + frontend build — green on every push.
