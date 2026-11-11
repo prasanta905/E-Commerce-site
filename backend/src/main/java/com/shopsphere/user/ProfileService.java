@@ -2,6 +2,7 @@ package com.shopsphere.user;
 
 import java.util.List;
 
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,10 +22,13 @@ public class ProfileService {
 
     private final UserRepository userRepository;
     private final AddressRepository addressRepository;
+    private final PasswordEncoder passwordEncoder;
 
-    public ProfileService(UserRepository userRepository, AddressRepository addressRepository) {
+    public ProfileService(UserRepository userRepository, AddressRepository addressRepository,
+                          PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.addressRepository = addressRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     // ---------------------------------------------------------- profile
@@ -45,8 +49,11 @@ public class ProfileService {
     @Transactional
     public void changePassword(Long userId, String currentPassword, String newPassword) {
         User user = user(userId);
-        // NOTE: verification of currentPassword happens in controller-layer via encoder
-        // to avoid injecting PasswordEncoder here — actually done below.
+        if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
+            throw BusinessException.badRequest("WRONG_PASSWORD", "Current password is incorrect");
+        }
+        // Dirty checking persists this because the method is transactional.
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
     }
 
     // ------------------------------------------------------- addresses

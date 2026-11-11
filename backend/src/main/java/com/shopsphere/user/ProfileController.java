@@ -13,9 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.shopsphere.common.ApiResponse;
-import com.shopsphere.common.exception.BusinessException;
 import com.shopsphere.security.CurrentUser;
-import com.shopsphere.user.repository.UserRepository;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -33,16 +31,10 @@ public class ProfileController {
 
     private final ProfileService profileService;
     private final CurrentUser currentUser;
-    private final UserRepository userRepository;
-    private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
-    public ProfileController(ProfileService profileService, CurrentUser currentUser,
-                             UserRepository userRepository,
-                             org.springframework.security.crypto.password.PasswordEncoder passwordEncoder) {
+    public ProfileController(ProfileService profileService, CurrentUser currentUser) {
         this.profileService = profileService;
         this.currentUser = currentUser;
-        this.userRepository = userRepository;
-        this.passwordEncoder = passwordEncoder;
     }
 
     @GetMapping
@@ -58,13 +50,8 @@ public class ProfileController {
 
     @PostMapping("/password")
     public ResponseEntity<Void> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
-        Long userId = currentUser.requireUserId();
-        userRepository.findById(userId).ifPresent(user -> {
-            if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
-                throw BusinessException.badRequest("WRONG_PASSWORD", "Current password is incorrect");
-            }
-            user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
-        });
+        profileService.changePassword(currentUser.requireUserId(),
+                request.currentPassword(), request.newPassword());
         return ResponseEntity.noContent().build();
     }
 

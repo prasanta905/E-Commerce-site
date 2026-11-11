@@ -74,6 +74,49 @@ class AuthRbacIntegrationTest {
     }
 
     @Test
+    void passwordChangePersistsAndOldPasswordStopsWorking() {
+        String email = uniqueEmail();
+        ResponseEntity<Map> registered = rest.postForEntity("/api/v1/auth/register",
+                entityMap(Map.of("fullName", "Password Tester", "email", email,
+                        "password", "Str0ngPass!2026", "phone", "+91-9000000001")), Map.class);
+        assertThat(registered.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+
+        String token = tokenFor(email, "Str0ngPass!2026");
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(token);
+        headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+
+        ResponseEntity<Void> changed = rest.exchange("/api/v1/users/me/password", HttpMethod.POST,
+                new HttpEntity<>(Map.of("currentPassword", "Str0ngPass!2026",
+                        "newPassword", "Even!Str0nger2026"), headers), Void.class);
+        assertThat(changed.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+
+        // The new password must work and the old one must be rejected.
+        assertThat(tokenFor(email, "Even!Str0nger2026")).isNotBlank();
+
+        ResponseEntity<Map> oldLogin = rest.postForEntity("/api/v1/auth/login",
+                entityMap(Map.of("email", email, "password", "Str0ngPass!2026")), Map.class);
+        assertThat(oldLogin.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void passwordChangeRejectsWrongCurrentPassword() {
+        String email = uniqueEmail();
+        rest.postForEntity("/api/v1/auth/register",
+                entityMap(Map.of("fullName", "Password Tester", "email", email,
+                        "password", "Str0ngPass!2026", "phone", "+91-9000000002")), Map.class);
+        String token = tokenFor(email, "Str0ngPass!2026");
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(token);
+        headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+
+        ResponseEntity<ApiError> res = rest.exchange("/api/v1/users/me/password", HttpMethod.POST,
+                new HttpEntity<>(Map.of("currentPassword", "WrongPass!2026",
+                        "newPassword", "Even!Str0nger2026"), headers), ApiError.class);
+        assertThat(res.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
     void unauthenticatedProtectedEndpointIs401() {
         ResponseEntity<String> res = rest.getForEntity("/api/v1/cart", String.class);
         assertThat(res.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
