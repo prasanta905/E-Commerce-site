@@ -11,6 +11,7 @@ import {
   ArrowRight,
   ShoppingBag,
   Truck,
+  QrCode,
 } from 'lucide-react';
 import { useCartStore } from '../store/cartStore';
 import { useAuthStore } from '../store/authStore';
@@ -31,7 +32,7 @@ export default function Checkout() {
 
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<'COD' | 'RAZORPAY'>('COD');
+  const [paymentMethod, setPaymentMethod] = useState<'COD' | 'RAZORPAY' | 'UPI'>('COD');
   const [shippingMethods, setShippingMethods] = useState<Array<{ id: number; code: string; name: string; baseFee: number; freeAbove: number }>>([]);
   const [selectedShippingId, setSelectedShippingId] = useState<number | null>(null);
   const [preview, setPreview] = useState<CheckoutPreview | null>(null);
@@ -164,12 +165,40 @@ export default function Checkout() {
         return;
       }
 
+      if (paymentMethod === 'UPI') {
+        // ---- YouPI hosted UPI: server creates the session, browser redirects.
+        // The order is NOT confirmed here; only the signed RECONCILED webhook
+        // may settle it. The return URL lands on the order detail page.
+        try {
+          const setup = await paymentService.createYoupiSession(res.orderId);
+          await clearCart();
+          window.location.assign(setup.checkoutUrl);
+          return;
+        } catch (setupErr: any) {
+          const code = setupErr.response?.data?.code;
+          const message =
+            code === 'YOUPI_NOT_CONFIGURED'
+              ? 'UPI payment is not configured on this environment. Please use Cash on Delivery.'
+              : setupErr.response?.data?.message ||
+                'Could not start UPI payment. Your order is saved as Pending — you can retry from your orders page.';
+          // The order and its stock reservation are already committed and the
+          // server cleared the cart. Send the customer to that order so a
+          // second click cannot create a duplicate order.
+          try {
+            await clearCart();
+          } finally {
+            navigate(`/orders/${res.orderId}`, { state: { paymentError: message } });
+          }
+          return;
+        }
+      }
+
       // ---- Razorpay flow: resolve gateway order → checkout modal → verify ----
       let setup;
       try {
         setup = await paymentService.createRazorpayOrder(res.orderId);
       } catch (setupErr: any) {
-        const code = setupErr.response?.data?.error?.code;
+        const code = setupErr.response?.data?.code;
         setErrorMsg(
           code === 'RAZORPAY_NOT_CONFIGURED'
             ? 'Online payment is not configured on this environment. Please use Cash on Delivery.'
@@ -232,7 +261,7 @@ export default function Checkout() {
       });
       checkout.open();
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.error?.message || 'Failed to place order. Please check stock or address.');
+      setErrorMsg(err.response?.data?.message || 'Failed to place order. Please check stock or address.');
       setIsSubmitting(false);
     }
   };
@@ -437,7 +466,7 @@ export default function Checkout() {
               3. Payment Method
             </h2>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {/* COD */}
               <label
                 className={`p-4 rounded-xl border cursor-pointer transition-all flex items-start gap-3 ${
@@ -487,7 +516,42 @@ export default function Checkout() {
                   <p className="text-slate-400 text-[11px]">Supports UPI, Net Banking, and Cards with instant confirmation.</p>
                 </div>
               </label>
+
+              {/* Self-hosted UPI via YouPI PG */}
+              <label
+                className={`p-4 rounded-xl border cursor-pointer transition-all flex items-start gap-3 ${
+                  paymentMethod === 'UPI'
+                    ? 'bg-indigo-950/20 border-indigo-500 ring-1 ring-indigo-500/50'
+                    : 'bg-slate-950 border-slate-800/80 hover:border-slate-700'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="paymentMethod"
+                  value="UPI"
+                  checked={paymentMethod === 'UPI'}
+                  onChange={() => setPaymentMethod('UPI')}
+                  className="mt-1 text-indigo-600 focus:ring-0"
+                />
+                <div className="text-xs space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold text-white">
+                    <QrCode size={16} className="text-emerald-400" />
+                    <span>UPI (YouPI)</span>
+                  </div>
+                  <p className="text-slate-400 text-[11px]">
+                    Self-hosted dynamic UPI QR. Confirmed only after the gateway reports a reconciled
+                    bank settlement.
+                  </p>
+                </div>
+              </label>
             </div>
+
+            {paymentMethod === 'UPI' && (
+              <p className="text-[11px] text-amber-300/90 bg-amber-950/30 border border-amber-900/50 rounded-lg px-3 py-2">
+                You will be redirected to the YouPI checkout to pay by UPI. The order stays Pending
+                until the bank settlement is reconciled — this can take longer than a card payment.
+              </p>
+            )}
           </section>
         </div>
 

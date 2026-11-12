@@ -38,8 +38,16 @@ services:
       RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
       RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
       RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}
+      YOUPI_ENABLED: ${YOUPI_ENABLED:-false}
+      YOUPI_BASE_URL: ${YOUPI_BASE_URL:-http://host.docker.internal:6100}
+      YOUPI_MERCHANT_ID: ${YOUPI_MERCHANT_ID:-}
+      YOUPI_MERCHANT_KEY: ${YOUPI_MERCHANT_KEY:-}
+      YOUPI_WEBHOOK_SECRET: ${YOUPI_WEBHOOK_SECRET:-}
+      YOUPI_RETURN_BASE_URL: ${YOUPI_RETURN_BASE_URL:-http://localhost:5173}
     volumes:
       - uploads:/app/uploads
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "8080:8080"
 

@@ -1,6 +1,6 @@
 # ShopSphere — Database Design (MySQL 8.4)
 
-Only 30 tables are declared here as the pre-agreed contract; Phase 3 produces the real Flyway migrations `V1__...` (schema) and `V2__...` (indexes) and `V3__...` (seed), plus entities that compile against them. Nothing here is final DDL until it is executed successfully.
+Only 30 tables were declared in the original Phase 3 contract, plus `youpi_events` added by Flyway `V5` for the optional self-hosted UPI flow. The migrations `V1`–`V5` are the executed source of truth.
 
 ## 1. ER Summary (textual)
 
@@ -21,13 +21,14 @@ wishlists 1 ── * wishlist_items 1 ── 1 products
 users 1 ─── * orders 1 ── * order_items 1 ── 1 products
 orders 1 ─── * order_status_history
 orders 1 ─── 1 payments 1 ── * payment_transactions
+payments 1 ── * youpi_events            (optional self-hosted UPI audit)
 orders 1 ─── 1 shipments
 coupons 1 ─── * coupon_usages
 orders 1 ─── * return_requests; payments 1 ─── * refunds
 users 1 ─── * notifications
 ```
 
-## 2. Table Catalogue (30 tables)
+## 2. Table Catalogue (31 tables)
 
 | Table | Purpose | Key columns |
 |---|---|---|
@@ -49,7 +50,8 @@ users 1 ─── * notifications
 | orders | orders master | id PK, user_id FK, address_snapshot JSON/TEXT, subtotal, discount, shipping, tax(?), total DECIMAL(10,2), status ENUM, payment_mode, idempotency_key UNIQUE |
 | order_items | order lines (immutable price snapshot) | id PK, order_id FK, product_id FK, product_name, unit_price DECIMAL, quantity, line_total |
 | order_status_history | state audit | id PK, order_id FK, from_status, to_status, changed_by, note, created_at |
-| payments | payment aggregate per order | id PK, order_id FK UNIQUE, method (COD/RAZORPAY), gateway_order_id UNIQUE, status, amount_paid |
+| payments | payment aggregate per order | id PK, order_id FK UNIQUE, method (COD/RAZORPAY/UPI), provider (RAZORPAY/YOUPI), gateway_order_id UNIQUE, checkout_url, utr, status, amount_paid |
+| youpi_events | YouPI session/webhook audit + delivery dedupe | id PK, delivery_id UNIQUE nullable, payment_id FK nullable, event/event_type, method, settlement_state, result/reason, order_reference, provider_payment_id, amount, utr, payload TEXT, received_at |
 | payment_transactions | each gateway attempt/webhook event | id PK, payment_id FK, razorpay_order_id, razorpay_payment_id UNIQUE nullable, razorpay_signature, status, payload_sha256, created_at |
 | shipments | fulfilment record | id PK, order_id FK UNIQUE, courier, tracking_number, shipped_at, delivered_at |
 | coupons | discounts | id PK, code UNIQUE, type (PERCENT/FIXED), value DECIMAL, min_order_amt, max_discount, start_at, expires_at, max_global_uses, max_uses_per_user, is_active |
@@ -68,6 +70,6 @@ users 1 ─── * notifications
 2. All money DECIMAL(10,2) INR — never float/int.
 3. `created_at`/`updated_at` on every table.
 4. Concurrency: pessimistic `SELECT … FOR UPDATE` inside transact­ions for inventory order/commit and coupon max-uses-per-user enforcement.
-5. Idempotency: orders.idempotency_key unique; payments.gateway_order_id unique.
+5. Idempotency: orders.idempotency_key unique; payments.gateway_order_id unique; youpi_events.delivery_id unique (webhook replay guard).
 6. Soft delete only on products/products-associated tables, categories, brands, coupons — `deleted_at` column.
 7. Full DDL shipped in Phase 3 as `V1__schema.sql` + `V2__indexes.sql` + `V3__seed.sql` under `backend/src/main/resources/db/migration/`.

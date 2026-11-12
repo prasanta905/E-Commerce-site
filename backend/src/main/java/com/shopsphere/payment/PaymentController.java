@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "Payments", description = "Razorpay order setup, checkout verification, webhook settlement")
+@Tag(name = "Payments", description = "Razorpay checkout, YouPI self-hosted UPI sessions, and signed webhook settlement")
 @RestController
 @RequestMapping("/api/v1/payments")
 public class PaymentController {
@@ -61,12 +61,30 @@ public class PaymentController {
                 new VerifyResponse("CONFIRMED", payment.getStatus().name())));
     }
 
+    @Operation(summary = "Create or resume a YouPI hosted UPI checkout for a PENDING order")
+    @PostMapping("/orders/{orderId}/youpi-session")
+    public ResponseEntity<ApiResponse<YoupiSessionDto>> createYoupiSession(@PathVariable Long orderId) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                paymentService.createYoupiSession(orderId, currentUser.requireUserId())));
+    }
+
     @Operation(summary = "Razorpay webhook (server-to-server; raw body must be HMAC-verified)")
     @PostMapping("/webhook")
     public ResponseEntity<Void> webhook(HttpServletRequest request) {
         String rawBody = readRawBody(request);
         String signature = request.getHeader("X-Razorpay-Signature");
         paymentService.handleWebhook(rawBody, signature);
+        return ResponseEntity.ok().build();
+    }
+
+    @Operation(summary = "YouPI webhook (server-to-server; settles UPI only on RECONCILED)")
+    @PostMapping("/webhook/youpi")
+    public ResponseEntity<Void> youpiWebhook(HttpServletRequest request) {
+        String rawBody = readRawBody(request);
+        paymentService.handleYoupiWebhook(
+                rawBody,
+                request.getHeader("X-Gateway-Signature"),
+                request.getHeader("X-Gateway-Delivery-Id"));
         return ResponseEntity.ok().build();
     }
 

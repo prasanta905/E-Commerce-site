@@ -91,6 +91,18 @@ shopsphere:
       webhook-secret: ${RAZORPAY_WEBHOOK_SECRET:}
       enabled: ${RAZORPAY_ENABLED:false}
 
+    # Self-hosted YouPI PG UPI gateway (experimental upstream project).
+    # The merchant key is server-only; the browser receives checkoutUrl only.
+    youpi:
+      enabled: ${YOUPI_ENABLED:false}
+      base-url: ${YOUPI_BASE_URL:http://localhost:6100}
+      merchant-id: ${YOUPI_MERCHANT_ID:}
+      merchant-key: ${YOUPI_MERCHANT_KEY:}
+      webhook-secret: ${YOUPI_WEBHOOK_SECRET:}
+      # Storefront origin used to build the return URL; its exact origin must
+      # also be allowlisted in YouPI's YOUPI_ALLOWED_RETURN_ORIGINS.
+      return-base-url: ${YOUPI_RETURN_BASE_URL:http://localhost:5173}
+
     mail:
       console-fallback: ${MAIL_CONSOLE_FALLBACK:true}
       from: ${MAIL_FROM:noreply@shopsphere.local}

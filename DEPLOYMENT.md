@@ -143,6 +143,7 @@ JWT_COOKIE_SECURE=true
 CORS_ALLOWED_ORIGINS=https://YOUR_NAME.duckdns.org
 PUBLIC_DOMAIN=YOUR_NAME.duckdns.org
 RAZORPAY_ENABLED=false
+YOUPI_ENABLED=false
 MAIL_CONSOLE_FALLBACK=true
 MAIL_FROM=noreply@shopsphere.local
 EOF
@@ -213,7 +214,57 @@ https://YOUR_NAME.duckdns.org/api/v1/payments/webhook
 
 Use test card `4111 1111 1111 1111`, any future expiry, CVV `123`. Without keys, online payment returns `503 RAZORPAY_NOT_CONFIGURED` and COD continues to work.
 
-### 2.10 Updates, logs, backups
+### 2.10 YouPI PG self-hosted UPI (optional, experimental)
+
+**YouPI PG is experimental research software, not an NPCI/RBI-certified payment aggregator.** It has no bank API: a UPI session becomes `RECONCILED` only after an admin imports a bank-statement CSV and one line matches the receiving account, amount in paise and 12-digit UTR. SMS/Gmail observers are alerting inputs, never settlement proof. Read the upstream `youpi-pg` warnings before using real money.
+
+YouPI is **not** part of `docker-compose.prod.yml`. Run it separately (on the VM host or a private host) and keep its merchant API port `6100` off the public internet; only the checkout portal and ShopSphere's webhook receiver need reachability.
+
+1. **Start the gateway** from the sibling `youpi-pg` checkout (Node >= 24.22.1):
+   ```bash
+   cp .env.example .env
+   # set:
+   #   YOUPI_ALLOWED_RETURN_ORIGINS=https://YOUR_NAME.duckdns.org
+   #   YOUPI_ALLOWED_ORIGINS=https://YOUR_NAME.duckdns.org
+   #   ADMIN_API_TOKEN=<random 64 hex chars>
+   npm install
+   npm start
+   ```
+2. **Configure the receiving VPA and webhook** (`Authorization: Bearer $ADMIN_API_TOKEN`):
+   ```bash
+   curl -X POST http://127.0.0.1:6100/api/v1/admin/upi-settings \
+     -H "Authorization: Bearer $ADMIN_API_TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"upiId":"your-name@bank","payeeName":"ShopSphere"}'
+
+   curl -X POST http://127.0.0.1:6100/api/v1/admin/merchant-settings \
+     -H "Authorization: Bearer $ADMIN_API_TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"webhookUrl":"https://YOUR_NAME.duckdns.org/api/v1/payments/webhook/youpi","webhookSecret":"<random-secret>"}'
+
+   curl -X POST http://127.0.0.1:6100/api/v1/admin/merchant-key/rotate \
+     -H "Authorization: Bearer $ADMIN_API_TOKEN"
+   # copy the one-time merchantKey from the response
+   ```
+3. **Point ShopSphere at it** in `.env` and restart the backend:
+   ```env
+   YOUPI_ENABLED=true
+   YOUPI_BASE_URL=http://host.docker.internal:6100
+   YOUPI_MERCHANT_ID=<merchant id>
+   YOUPI_MERCHANT_KEY=<rotated merchantKey>
+   YOUPI_WEBHOOK_SECRET=<the same webhookSecret>
+   YOUPI_RETURN_BASE_URL=https://YOUR_NAME.duckdns.org
+   ```
+   `docker-compose.prod.yml` already maps `host.docker.internal` to the Docker host.
+4. **Verify**: place a UPI order, confirm the browser redirects to the YouPI checkout, and confirm the order stays `PENDING`. It must remain pending after an observer alert (`OBSERVED_SUCCESS`) and move forward only after the YouPI admin imports a matching statement line (`RECONCILED`). YouPI also requires a fresh SMS-observer heartbeat before creating new sessions outside its test mode.
+
+Operational notes:
+- Refunds are **manual bank transfers**, recorded in ShopSphere's admin refund ledger. YouPI has no refund API.
+- `FAILED`/`EXPIRED`/`CANCELLED` webhooks do not cancel the ShopSphere order or release stock; the customer can retry the hosted checkout.
+- YouPI webhook retries reuse `X-Gateway-Delivery-Id`; ShopSphere deduplicates them in `youpi_events`.
+- A distinct reconciled delivery for an already-paid order is recorded as `REJECTED` (“manual refund review”); it never changes the order or the original UTR. Check `youpi_events` for this after a customer reports a double debit.
+
+### 2.11 Updates, logs, backups
 
 ```bash
 # update
@@ -234,7 +285,7 @@ docker stats --no-stream
 
 Flyway applies new migrations automatically on backend start.
 
-### 2.11 Troubleshooting
+### 2.12 Troubleshooting
 
 | Symptom | Cause / fix |
 |---|---|
@@ -244,6 +295,9 @@ Flyway applies new migrations automatically on backend start.
 | `502 Bad Gateway` | Backend still booting or crashed → `docker compose logs backend` |
 | MySQL healthcheck fails | `.env` password changed after the volume was created. Either restore the old password or recreate the volume (`docker compose down -v` — **deletes data**) |
 | Backend cannot connect to DB | Check `SPRING_DATASOURCE_*`, and that `db` is healthy |
+| UPI button returns `YOUPI_NOT_CONFIGURED` | `YOUPI_ENABLED`, merchant id/key, webhook secret or return base URL is empty; set all `YOUPI_*` values and restart |
+| UPI button returns `YOUPI_GATEWAY_ERROR` | YouPI is down, unreachable from the backend container (`YOUPI_BASE_URL`), or refusing sessions because no SMS observer heartbeat is fresh |
+| UPI order stays PENDING after paying | Expected until YouPI imports a matching bank-statement line and emits `RECONCILED`; an observer alert alone is not settlement |
 
 ---
 
@@ -314,7 +368,7 @@ If any of these are deal-breakers, Path A avoids all of them for the same $0.
 | `docker-compose.prod.yml` | Production stack: no DB/backend host ports, restart policies, Caddy |
 | `Caddyfile` | Automatic HTTPS for `PUBLIC_DOMAIN` |
 | `frontend/nginx.conf` | SPA fallback + `/api`, `/uploads`, Swagger, health proxying |
-| `.env.example` | Template with the production variables |
-| `DEPLOYMENT.md` | This guide |
+| `.env.example` | Template with production variables, including the optional `YOUPI_*` UPI settings |
+| `DEPLOYMENT.md` | This guide (including the experimental YouPI UPI section) |
 
 Every push to `Main` runs CI (backend tests against MySQL 8 + frontend production build), so the commit you deploy is the commit that passed.

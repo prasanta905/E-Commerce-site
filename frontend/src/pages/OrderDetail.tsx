@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import {
   ArrowLeft,
   Package,
@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   XCircle,
   RotateCcw,
+  QrCode,
 } from 'lucide-react';
 import { orderService } from '../services/orderService';
 import { paymentService } from '../services/paymentService';
@@ -28,6 +29,8 @@ const ORDER_STEPS = [
 const OrderDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [order, setOrder] = useState<OrderDetailType | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +41,11 @@ const OrderDetail: React.FC = () => {
   const [reason, setReason] = useState<string>('');
   const [actionLoading, setActionLoading] = useState<boolean>(false);
   const [payLoading, setPayLoading] = useState<boolean>(false);
-  const [payError, setPayError] = useState<string | null>(null);
+  const [payError, setPayError] = useState<string | null>(
+    (location.state as { paymentError?: string } | null)?.paymentError ?? null
+  );
+
+  const returnedFromYoupi = searchParams.get('payment') === 'youpi';
 
   const fetchOrderDetail = async () => {
     if (!id) return;
@@ -58,12 +65,21 @@ const OrderDetail: React.FC = () => {
     fetchOrderDetail();
   }, [id]);
 
-  /** Resume payment for a PENDING Razorpay order (checkout modal → verify). */
+  /** Resume payment for a PENDING online order (Razorpay modal or YouPI redirect). */
   const handleCompletePayment = async () => {
     if (!order) return;
     try {
       setPayLoading(true);
       setPayError(null);
+
+      if (order.paymentMethod === 'UPI') {
+        // Server creates/reuses the hosted YouPI session; only the signed
+        // RECONCILED webhook can settle the order after the redirect.
+        const session = await paymentService.createYoupiSession(order.id);
+        window.location.assign(session.checkoutUrl);
+        return;
+      }
+
       const setup = await paymentService.createRazorpayOrder(order.id);
       const loaded = await paymentService.loadCheckoutScript();
       const RazorpayCtor = (window as unknown as {
@@ -111,9 +127,12 @@ const OrderDetail: React.FC = () => {
       });
       checkout.open();
     } catch (err: any) {
+      const code = err.response?.data?.code;
+      const message = err.response?.data?.message;
       setPayError(
-        err.response?.data?.message ||
-          'Could not start online payment. Please try again later.'
+        code === 'YOUPI_NOT_CONFIGURED'
+          ? 'UPI payment is not configured on this environment. Please choose Cash on Delivery on a new order.'
+          : message || 'Could not start online payment. Please try again later.'
       );
       setPayLoading(false);
     }
@@ -176,7 +195,9 @@ const OrderDetail: React.FC = () => {
   const isReturned = order.status === 'RETURNED' || order.status === 'RETURN_REQUESTED';
   const isCancellable = order.status === 'PENDING' || order.status === 'CONFIRMED';
   const isReturnable = order.status === 'DELIVERED';
-  const isAwaitingPayment = order.status === 'PENDING' && order.paymentMethod === 'RAZORPAY';
+  const isAwaitingPayment =
+    order.status === 'PENDING' &&
+    (order.paymentMethod === 'RAZORPAY' || order.paymentMethod === 'UPI');
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -208,6 +229,69 @@ const OrderDetail: React.FC = () => {
         </div>
       </div>
 
+      {/* YouPI return banner: the redirect is never proof of payment. */}
+      {returnedFromYoupi && (
+        <div
+          className={`mb-6 p-5 rounded-2xl border flex flex-wrap items-start justify-between gap-3 ${
+            order.status === 'PENDING'
+              ? 'border-sky-200 bg-sky-50'
+              : order.status === 'CANCELLED'
+                ? 'border-slate-200 bg-slate-50'
+                : 'border-emerald-200 bg-emerald-50'
+          }`}
+        >
+          <div className="flex items-start gap-3">
+            {order.status === 'PENDING' ? (
+              <QrCode className="w-5 h-5 text-sky-600 mt-0.5" />
+            ) : order.status === 'CANCELLED' ? (
+              <AlertCircle className="w-5 h-5 text-slate-500 mt-0.5" />
+            ) : (
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 mt-0.5" />
+            )}
+            <div>
+              <p
+                className={`text-sm font-semibold ${
+                  order.status === 'PENDING'
+                    ? 'text-sky-900'
+                    : order.status === 'CANCELLED'
+                      ? 'text-slate-700'
+                      : 'text-emerald-900'
+                }`}
+              >
+                {order.status === 'PENDING'
+                  ? 'UPI payment submitted — awaiting bank reconciliation'
+                  : order.status === 'CANCELLED'
+                    ? 'This order was cancelled'
+                    : 'UPI payment confirmed'}
+              </p>
+              <p className="text-xs text-slate-600 mt-1 max-w-2xl">
+                {order.status === 'PENDING'
+                  ? 'YouPI confirms an order only after the gateway matches a reconciled bank settlement. This page does not mark the order paid on its own — you can safely close it and check back later.'
+                  : order.status === 'CANCELLED'
+                    ? 'If money left your account for a cancelled order, contact support with the UTR before retrying payment.'
+                    : 'The gateway reported a reconciled UPI settlement and the order has moved forward.'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={fetchOrderDetail}
+              className="px-4 py-2 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+            >
+              Refresh status
+            </button>
+            <button
+              type="button"
+              onClick={() => setSearchParams({}, { replace: true })}
+              className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:text-slate-700 transition"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Pending payment banner */}
       {isAwaitingPayment && (
         <div className="mb-6 p-5 rounded-2xl border border-amber-200 bg-amber-50 flex flex-wrap items-center justify-between gap-3">
@@ -216,7 +300,9 @@ const OrderDetail: React.FC = () => {
             <div>
               <p className="text-sm font-semibold text-amber-900">Payment pending</p>
               <p className="text-xs text-amber-800">
-                This order was placed with online payment but the payment is not complete yet.
+                {order.paymentMethod === 'UPI'
+                  ? 'This UPI order is still awaiting a reconciled bank settlement. Retry the hosted checkout if you have not paid yet.'
+                  : 'This order was placed with online payment but the payment is not complete yet.'}
               </p>
               {payError && (
                 <p className="text-xs text-rose-600 mt-1">{payError}</p>
@@ -228,7 +314,11 @@ const OrderDetail: React.FC = () => {
             disabled={payLoading}
             className="px-5 py-2.5 rounded-xl bg-amber-600 text-white text-sm font-semibold hover:bg-amber-700 disabled:opacity-60 transition"
           >
-            {payLoading ? 'Opening payment…' : 'Complete Payment'}
+            {payLoading
+              ? 'Opening payment…'
+              : order.paymentMethod === 'UPI'
+                ? 'Pay with UPI'
+                : 'Complete Payment'}
           </button>
         </div>
       )}

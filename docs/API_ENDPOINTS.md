@@ -55,15 +55,17 @@ GET/POST/PUT/DELETE /users/me/addresses[/id]
 ## Checkout 🔒
 | GET | /checkout/shipping-methods | - | [{id, code, name, baseFee, freeAbove}] — code-defined catalogue |
 | POST | /checkout/preview | {addressId, shippingMethodId, couponCode?} | CheckoutPreviewDto {subtotal, discount, shippingFee, total, shippingMethodName, stockIssues[]} |
-| POST | /checkout | {addressId, shippingMethodId, couponCode?, paymentMethod (COD\|RAZORPAY), idempotencyKey, termsAccepted: "true"} | creates order (PENDING if prepaid, CONFIRMED if COD) → {orderId} — repeated idempotencyKey returns the same order |
+| POST | /checkout | {addressId, shippingMethodId, couponCode?, paymentMethod (COD\|RAZORPAY\|UPI), idempotencyKey, termsAccepted: "true"} | creates order (PENDING if prepaid/UPI, CONFIRMED if COD) → {orderId} - repeated idempotencyKey returns the same order |
 
 ## Orders 🔒
 GET /orders?page (own only) · GET /orders/{id} · POST /orders/{id}/cancel · POST /orders/{id}/return-request {reason} · GET /orders/{id}/invoice (PDF, owner-only, unavailable while PENDING/CANCELLED)
 
 ## Payments 🔒
-POST /payments/orders/{orderId}/create → PaymentSetupDto {gatewayOrderId, keyId, amount, currency, orderNumber, paymentStatus} — owner-scoped, idempotent, 503 RAZORPAY_NOT_CONFIGURED when disabled
+POST /payments/orders/{orderId}/create → PaymentSetupDto {gatewayOrderId, keyId, amount, currency, orderNumber, paymentStatus} - owner-scoped, idempotent, 503 RAZORPAY_NOT_CONFIGURED when disabled
+POST /payments/orders/{orderId}/youpi-session → YoupiSessionDto {paymentId, checkoutUrl, amount, currency, orderNumber, paymentStatus, gatewayStatus} - owner-scoped, 503 YOUPI_NOT_CONFIGURED when disabled; UPI order stays PENDING
 POST /payments/verify {razorpayOrderId, razorpayPaymentId, razorpaySignature} → HMAC(gatewayOrderId|paymentId) verify → order CONFIRMED → {orderStatus, paymentStatus} (idempotent for already-paid)
-POST /payments/webhook — raw Razorpay payload HMAC-verified via X-Razorpay-Signature (idempotent settlement)
+POST /payments/webhook - raw Razorpay payload HMAC-verified via X-Razorpay-Signature (idempotent settlement)
+POST /payments/webhook/youpi - raw YouPI payload HMAC-verified via X-Gateway-Signature, deduped by X-Gateway-Delivery-Id; settles ONLY when event=RECONCILED + method=UPI + settlementState=RECONCILED
 
 ## Admin 🔒 ROLE_ADMIN
 GET /admin/dashboard · GET /admin/analytics?period=daily|weekly|monthly|yearly&from&to

@@ -52,12 +52,28 @@ public class Payment extends TimestampedEntity {
     @Column(name = "method", nullable = false, length = 15)
     private PaymentMethod method;
 
-    /** Razorpay `order.id` — unique key for idempotent creation. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "provider", nullable = false, length = 15)
+    @Builder.Default
+    private PaymentProvider provider = PaymentProvider.RAZORPAY;
+
+    /**
+     * Gateway session id — Razorpay `order.id` or YouPI `paymentId`.
+     * Unique key for idempotent creation and webhook lookup.
+     */
     @Column(name = "gateway_order_id", unique = true, length = 64)
     private String gatewayOrderId;
 
+    /** Hosted checkout URL returned by YouPI (null for Razorpay). */
+    @Column(name = "checkout_url", length = 1024)
+    private String checkoutUrl;
+
     @Column(name = "razorpay_payment_id", length = 64)
     private String razorpayPaymentId;
+
+    /** Bank UTR recorded only after YouPI reports a reconciled UPI settlement. */
+    @Column(name = "utr", length = 32)
+    private String utr;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 15)

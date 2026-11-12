@@ -14,7 +14,7 @@ public record CheckoutRequest(
         @NotNull Long addressId,
         @NotNull Long shippingMethodId,
         String couponCode,
-        @NotNull @Pattern(regexp = "COD|RAZORPAY", message = "paymentMethod must be COD or RAZORPAY")
+        @NotNull @Pattern(regexp = "COD|RAZORPAY|UPI", message = "paymentMethod must be COD, RAZORPAY or UPI")
         String paymentMethod,
         @Size(max = 64) String idempotencyKey
 ) {}

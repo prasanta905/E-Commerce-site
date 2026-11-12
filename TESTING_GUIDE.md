@@ -134,7 +134,7 @@ Note: responses use the envelope `{ "success": true, "data": ... }`; lists are p
 ## 5. Automated tests
 
 ```powershell
-# Backend — 9 integration tests (context + auth/RBAC + checkout flow)
+# Backend — 20 integration tests (context + auth/RBAC + checkout + YouPI webhooks)
 cd backend
 $env:Path = [Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [Environment]::GetEnvironmentVariable("Path","User") + ";C:\Users\ASUS\tools\apache-maven-3.9.9\bin"
 mvn test
@@ -144,12 +144,13 @@ cd ../frontend
 & "C:\Program Files\nodejs\npm.cmd" run build
 ```
 
-Expected: `Tests run: 9, Failures: 0, Errors: 0` and `BUILD SUCCESS`; frontend build emits `dist/` with 0 TS errors.
+Expected: `Tests run: 20, Failures: 0, Errors: 0` and `BUILD SUCCESS`; frontend build emits `dist/` with 0 TS errors.
 
 Test classes:
 - `ShopSphereApplicationTests` — Spring context boots against the test schema.
-- `AuthRbacIntegrationTest` (5) — register/duplicate/wrong password, anonymous 401, customer→admin 403, admin 200, cross-user order hidden.
+- `AuthRbacIntegrationTest` (7) — register/duplicate/wrong password, anonymous 401, customer→admin 403, admin 200, cross-user order hidden.
 - `CheckoutFlowIntegrationTest` (3) — full COD purchase with idempotency replay, unknown coupon 4xx, missing terms rejection.
+- `YoupiWebhookIntegrationTest` (9) — reconciled UPI settlement, observer-only/non-reconciled ignores, duplicate delivery, bad signature, amount mismatch, delivery-id reuse, earlier-attempt settlement and duplicate-settlement refund flagging.
 
 ---
 
@@ -172,12 +173,16 @@ razorpay.webhook-secret=some-dev-secret
 5. Webhook endpoint: `POST /api/v1/payments/webhook` (raw body HMAC, idempotent by event id).
 6. Dismiss the modal → order stays `PENDING`; **Order Detail** shows a "Complete Payment" banner to resume.
 
+### YouPI PG (self-hosted UPI) — optional, experimental
+
+UPI uses a separately hosted YouPI PG gateway (see README §4.5 and `DEPLOYMENT.md` §2.10). The browser is redirected by `POST /api/v1/payments/orders/{id}/youpi-session`; the order stays `PENDING` until a signed `RECONCILED` webhook. To exercise the contract without real money, send a raw JSON body signed with `HMAC-SHA256(YOUPI_WEBHOOK_SECRET)` in `X-Gateway-Signature` and a unique `X-Gateway-Delivery-Id`. `OBSERVED_SUCCESS`/`SUCCESS` must never confirm an order; only `event=RECONCILED` + `method=UPI` + `settlementState=RECONCILED` does. `YoupiWebhookIntegrationTest` covers this end-to-end over HTTP.
+
 ---
 
 ## 7. Known limitations (honest list)
 
 1. **Docker not installed** — `docker-compose.yml` + both Dockerfiles + nginx config are written and reviewed but **never executed**. Local Maven/npm runs are the verified path.
-2. **Razorpay** requires your own test keys (above). Without them, online payment returns 503; COD works fully.
+2. **Razorpay / YouPI** require your own credentials (above). Without them, online payment returns 503; COD works fully. YouPI is experimental and needs a separately running gateway plus a reconciled bank statement before a UPI order settles.
 3. **Seed data** — 18 products; some share placeholder images (9 files reused). Everything else is real DB data, not mocks.
 4. **COD refunds are offline** — a returned COD order restocks inventory and marks the order `RETURNED`, but no `Refund` ledger row is created because there was no captured online payment. Documented in the admin Returns screen.
 5. Dev database contains smoke-test artifacts (orders 1–2, review id 5, wishlist items, `it-*@shopsphere.local` users). Harmless; wipe with Flyway clean or drop/recreate the `shopsphere` schema if you want a pristine demo.

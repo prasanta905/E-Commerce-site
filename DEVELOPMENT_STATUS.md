@@ -6,9 +6,10 @@ _Updated: End of Full Stack Integration & Verification Cycle_
 
 | Component | Status | Port / URL | Details |
 |---|---|---|---|
-| **Backend** | ✅ **UP & RUNNING** | `http://localhost:8080` | Spring Boot 3.4.x, Java 21 LTS, Actuator, Flyway V1-V4 |
+| **Backend** | ✅ **UP & RUNNING** | `http://localhost:8080` | Spring Boot 3.5.16, Java 21 LTS, Actuator, Flyway V1-V5 |
 | **Frontend** | ✅ **UP & RUNNING** | `http://127.0.0.1:5173` | React 19, TypeScript, Vite, Tailwind CSS, Zustand, TanStack Query |
-| **Database** | ✅ **ACTIVE** | `localhost:3306` | MySQL 8.4 LTS (`shopsphere`), 30 tables, seeded catalog & users |
+| **Database** | ✅ **ACTIVE** | `localhost:3306` | MySQL 8.4 LTS (`shopsphere`), 31 tables, seeded catalog & users |
+| **YouPI PG (UPI)** | ⚪ **NOT RUNNING** | `http://localhost:6100` | Optional self-hosted gateway; webhook contract covered by tests, live session not verified |
 | **API Docs** | ✅ **LIVE** | `http://localhost:8080/swagger-ui.html` | OpenAPI 3.0 / Swagger UI (~60 endpoints documented) |
 | **Postman** | ✅ **READY** | `ShopSphere_Postman_Collection.json` | 5 folders with auto-token capture for Admin & Customer |
 
@@ -133,3 +134,30 @@ _Updated: End of Full Stack Integration & Verification Cycle_
 ### Verified this cycle
 - `mvn test` → **11 tests, 0 failures** (AuthRbacIntegrationTest 7, CheckoutFlowIntegrationTest 3, context 1).
 - CI on GitHub Actions: backend suite against MySQL 8 + frontend build — green on every push.
+
+---
+
+## 8. YouPI PG Self-Hosted UPI Integration (Nov 13, 2026)
+
+### What shipped
+- **Flyway `V5__youpi_upi_payments.sql`**: adds `payments.provider`, `payments.checkout_url`, `payments.utr`, an index on provider, and the append-only `youpi_events` audit/dedupe table (unique `delivery_id`).
+- **New server flow**:
+  - `POST /api/v1/payments/orders/{orderId}/youpi-session` creates or resumes a hosted UPI session server-side (merchant key never reaches the browser) and returns `checkoutUrl`.
+  - `POST /api/v1/payments/webhook/youpi` verifies HMAC-SHA256 over the raw request body, deduplicates `X-Gateway-Delivery-Id`, cross-checks order/amount/currency/payment id, and settles only on `event=RECONCILED` + `method=UPI` + `settlementState=RECONCILED`.
+  - Non-authoritative events (`OBSERVED_SUCCESS`, `SUCCESS`, `MANUAL_REVIEW`, `FAILED`, `EXPIRED`, `CANCELLED`) are recorded with a reason but never change order state. Failed/expired UPI attempts do not cancel the order or release stock.
+- **Order/payment integrity**: `PaymentMethod` now includes `UPI`; `PaymentProvider` distinguishes Razorpay from YouPI; Razorpay verify/webhook handlers reject YouPI rows and vice versa. YouPI UTR is stored only after reconciliation, never in the Razorpay payment-id column.
+- **Frontend**: checkout has a third payment option (`UPI (YouPI)`) that creates the session after order creation and redirects to the hosted checkout. Order Detail resumes a PENDING UPI order and shows a `?payment=youpi` return banner that explicitly says the redirect is not proof of payment.
+- **Config/deploy docs**: `application.yml`, `.env.example`, both compose files (including `host.docker.internal:host-gateway`), README and `DEPLOYMENT.md` document `YOUPI_*` settings. Existing Razorpay and COD flows remain unchanged.
+
+### Verification
+- `mvn test` → **20 tests, 0 failures** (AuthRbac 7, CheckoutFlow 3, context 1, **YoupiWebhook 9**).
+- YouPI tests cover: reconciled settlement + UTR, observer alert non-fulfillment, ignored `SUCCESS`/COD/non-reconciled variants, duplicate delivery id, invalid signature, amount mismatch, delivery-id reuse, a late reconciled settlement for an earlier resumed attempt, and a second settlement on an already-paid order flagged for manual refund review.
+- `npm run build` → **0 TypeScript errors**.
+- Flyway applied V5 successfully on the local MySQL instance during the test run.
+
+### Honest limitations / not verified
+- **No live YouPI instance was run for this change.** No merchant API key, webhook secret, receiving VPA, bank account, SMS observer or Gmail observer was configured, so a real UPI payment was **not** executed end-to-end.
+- YouPI PG is explicitly **experimental research software**; it is not NPCI/RBI-certified, has no bank API, and requires an admin to import a bank-statement CSV before a session becomes `RECONCILED`. It must not be presented as a production payment aggregator.
+- YouPI gates new sessions on a fresh SMS-observer heartbeat outside its test mode. Without a paired Android observer (or documented test-mode run), session creation will fail even when the backend is configured.
+- YouPI refunds are manual bank transfers recorded in ShopSphere's admin refund ledger; there is no gateway refund API.
+- Docker is still not installed on this machine, so the updated compose files are documented but **not executed**.

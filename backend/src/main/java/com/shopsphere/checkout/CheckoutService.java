@@ -43,8 +43,10 @@ import com.shopsphere.user.repository.UserRepository;
  *
  * Reserve → order → items snapshot → coupon redemption → payment row
  *  ├─ COD:   order = CONFIRMED, stock committed immediately
- *  └─ RAZORPAY: order = PENDING, stock held until verify/webhook;
- *                failure releases the reservation (PaymentService).
+ *  ├─ RAZORPAY: order = PENDING, stock held until verify/webhook;
+ *  │            failure releases the reservation (PaymentService).
+ *  └─ UPI:   order = PENDING, stock held until a signed YouPI RECONCILED
+ *            webhook settles it; failed/expired attempts stay payable.
  *
  * Idempotency: the optional client-supplied key is unique-indexed on orders.
  */
@@ -255,8 +257,13 @@ public class CheckoutService {
             appendHistory(order, previous, OrderStatus.CONFIRMED, "system", "COD order confirmed");
             cartItemRepository.deleteByCartId(cartIdOf(items));
         } else {
-            // 8b. RAZORPAY: reservation held; payment orchestration below.
-            paymentService.resolveRazorpayOrder(order);
+            // 8b. Online payment: reservation held until the gateway settles.
+            //     YouPI UPI gets its hosted session from the payment endpoint
+            //     immediately after checkout, so a gateway outage never rolls
+            //     back the order (it stays PENDING and resumable).
+            if (order.getPaymentMethod() == PaymentMethod.RAZORPAY) {
+                paymentService.resolveRazorpayOrder(order);
+            }
             cartItemRepository.deleteByCartId(cartIdOf(items));
         }
 

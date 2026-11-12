@@ -15,6 +15,16 @@ export interface VerifyResult {
   paymentStatus: string;
 }
 
+export interface YoupiSession {
+  paymentId: string;
+  checkoutUrl: string;
+  amount: number;
+  currency: string;
+  orderNumber: string;
+  paymentStatus: string;
+  gatewayStatus?: string | null;
+}
+
 export const paymentService = {
   /** Loads the Razorpay checkout.js SDK once (idempotent across retries). */
   loadCheckoutScript(): Promise<boolean> {
@@ -33,6 +43,14 @@ export const paymentService = {
   createRazorpayOrder: async (orderId: number): Promise<RazorpaySetup> => {
     const res = await api.post<ApiResponse<RazorpaySetup>>(
       `/payments/orders/${orderId}/create`
+    );
+    return res.data.data;
+  },
+
+  /** Create or resume the server-authoritative YouPI UPI checkout session. */
+  createYoupiSession: async (orderId: number): Promise<YoupiSession> => {
+    const res = await api.post<ApiResponse<YoupiSession>>(
+      `/payments/orders/${orderId}/youpi-session`
     );
     return res.data.data;
   },
